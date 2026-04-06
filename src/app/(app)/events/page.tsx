@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { db } from "@/db";
 import { events, eventSponsors, guests } from "@/db/schema";

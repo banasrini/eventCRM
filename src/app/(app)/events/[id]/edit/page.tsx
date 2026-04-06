@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
 import { events } from "@/db/schema";
