@@ -1,0 +1,34 @@
+import { db } from "@/db";
+import { tasks } from "@/db/schema";
+import { generateId } from "@/lib/utils";
+import { CreateTaskSchema } from "@/lib/validations";
+import { eq } from "drizzle-orm";
+
+export async function GET(
+  _req: Request,
+  ctx: RouteContext<"/api/events/[id]/tasks">
+) {
+  const { id: eventId } = await ctx.params;
+  const rows = await db.select().from(tasks).where(eq(tasks.eventId, eventId));
+  return Response.json(rows);
+}
+
+export async function POST(
+  request: Request,
+  ctx: RouteContext<"/api/events/[id]/tasks">
+) {
+  const { id: eventId } = await ctx.params;
+  const body = await request.json();
+  const parsed = CreateTaskSchema.safeParse(body);
+  if (!parsed.success) {
+    return Response.json({ error: parsed.error.flatten() }, { status: 400 });
+  }
+
+  const now = new Date().toISOString();
+  const [row] = await db
+    .insert(tasks)
+    .values({ id: generateId(), eventId, ...parsed.data, createdAt: now, updatedAt: now })
+    .returning();
+
+  return Response.json(row, { status: 201 });
+}
