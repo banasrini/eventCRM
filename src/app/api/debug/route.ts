@@ -25,10 +25,11 @@ export async function GET() {
     errors.push(`Turso raw fetch error: ${String(e)}`);
   }
 
-  // Test 3: drizzle client
+  // Test 3: drizzle client with select
   try {
     const { db } = await import("@/db");
-    const result = await db.execute({ sql: "SELECT 1 as ok", args: [] });
+    const { sql } = await import("drizzle-orm");
+    const result = await db.run(sql`SELECT 1 as ok`);
     errors.push(`Drizzle: ok - ${JSON.stringify(result).slice(0, 100)}`);
   } catch (e) {
     errors.push(`Drizzle error: ${String(e)}`);
