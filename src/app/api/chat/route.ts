@@ -7,6 +7,8 @@ import { handleTool } from "@/lib/ai/tool-handlers";
 import { buildSystemPrompt } from "@/lib/ai/system-prompt";
 import { eq, desc } from "drizzle-orm";
 
+export const maxDuration = 60;
+
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
