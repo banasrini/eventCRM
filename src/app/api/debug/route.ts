@@ -33,7 +33,8 @@ export async function GET() {
     const [row] = await db.select({ n: count() }).from(sponsors);
     errors.push(`Drizzle: ok - count=${row.n}`);
   } catch (e) {
-    errors.push(`Drizzle error: ${String(e)}`);
+    const err = e as Error;
+    errors.push(`Drizzle error: ${err.message} | cause: ${String((err as any).cause)} | stack: ${err.stack?.slice(0, 500)}`);
   }
 
   return Response.json({ checks: errors });
