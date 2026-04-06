@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 
 export async function GET(
   _req: Request,
-  ctx: RouteContext<"/api/sponsors/[id]">
+  ctx: { params: Promise<{ id: string }> }
 ) {
   const { id } = await ctx.params;
 
@@ -38,7 +38,7 @@ export async function GET(
 
 export async function PATCH(
   request: Request,
-  ctx: RouteContext<"/api/sponsors/[id]">
+  ctx: { params: Promise<{ id: string }> }
 ) {
   const { id } = await ctx.params;
   const body = await request.json();
@@ -66,7 +66,7 @@ export async function PATCH(
 
 export async function DELETE(
   _req: Request,
-  ctx: RouteContext<"/api/sponsors/[id]">
+  ctx: { params: Promise<{ id: string }> }
 ) {
   const { id } = await ctx.params;
   await db.delete(sponsors).where(eq(sponsors.id, id));

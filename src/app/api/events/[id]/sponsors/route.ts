@@ -6,7 +6,7 @@ import { eq, and } from "drizzle-orm";
 
 export async function GET(
   _req: Request,
-  ctx: RouteContext<"/api/events/[id]/sponsors">
+  ctx: { params: Promise<{ id: string }> }
 ) {
   const { id: eventId } = await ctx.params;
 
@@ -32,7 +32,7 @@ export async function GET(
 
 export async function POST(
   request: Request,
-  ctx: RouteContext<"/api/events/[id]/sponsors">
+  ctx: { params: Promise<{ id: string }> }
 ) {
   const { id: eventId } = await ctx.params;
   const body = await request.json();
@@ -69,7 +69,7 @@ export async function POST(
 
 export async function PATCH(
   request: Request,
-  ctx: RouteContext<"/api/events/[id]/sponsors">
+  ctx: { params: Promise<{ id: string }> }
 ) {
   const { id: eventId } = await ctx.params;
   const url = new URL(request.url);
@@ -94,7 +94,7 @@ export async function PATCH(
 
 export async function DELETE(
   request: Request,
-  ctx: RouteContext<"/api/events/[id]/sponsors">
+  ctx: { params: Promise<{ id: string }> }
 ) {
   const { id: eventId } = await ctx.params;
   const url = new URL(request.url);

@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 
 export async function PATCH(
   request: Request,
-  ctx: RouteContext<"/api/events/[id]/guests/[guestId]">
+  ctx: { params: Promise<{ id: string; guestId: string }> }
 ) {
   const { guestId } = await ctx.params;
   const body = await request.json();
@@ -26,7 +26,7 @@ export async function PATCH(
 
 export async function DELETE(
   _req: Request,
-  ctx: RouteContext<"/api/events/[id]/guests/[guestId]">
+  ctx: { params: Promise<{ id: string; guestId: string }> }
 ) {
   const { guestId } = await ctx.params;
   await db.delete(guests).where(eq(guests.id, guestId));

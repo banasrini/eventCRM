@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 
 export async function GET(
   _req: Request,
-  ctx: RouteContext<"/api/events/[id]/budget">
+  ctx: { params: Promise<{ id: string }> }
 ) {
   const { id: eventId } = await ctx.params;
   const rows = await db
@@ -18,7 +18,7 @@ export async function GET(
 
 export async function POST(
   request: Request,
-  ctx: RouteContext<"/api/events/[id]/budget">
+  ctx: { params: Promise<{ id: string }> }
 ) {
   const { id: eventId } = await ctx.params;
   const body = await request.json();
