@@ -254,11 +254,11 @@ function GuestsTab({ eventId, guests }: Pick<EventActionsClientProps, "eventId" 
     router.refresh();
   }
 
-  async function updateRsvp(guestId: string, rsvpStatus: string) {
+  async function updateField(guestId: string, patch: Record<string, string>) {
     await fetch(`/api/events/${eventId}/guests/${guestId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ rsvpStatus }),
+      body: JSON.stringify(patch),
     });
     router.refresh();
   }
@@ -389,15 +389,32 @@ function GuestsTab({ eventId, guests }: Pick<EventActionsClientProps, "eventId" 
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">{g.company ?? "—"}</TableCell>
                 <TableCell>
-                  {g.contactedVia ? (
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${CONTACTED_VIA_COLORS[g.contactedVia]}`}>
-                      {CONTACTED_VIA_LABELS[g.contactedVia]}
-                    </span>
-                  ) : "—"}
+                  <Select defaultValue={g.contactedVia ?? ""} onValueChange={(v) => updateField(g.id, { contactedVia: v ?? "" })}>
+                    <SelectTrigger className="h-7 w-28 text-xs">
+                      <SelectValue placeholder="—" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="linkedin">LinkedIn</SelectItem>
+                      <SelectItem value="email">Email</SelectItem>
+                      <SelectItem value="msg">Msg</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </TableCell>
-                <TableCell className="capitalize text-sm">{g.role}</TableCell>
                 <TableCell>
-                  <Select defaultValue={g.rsvpStatus ?? "pending"} onValueChange={(v) => updateRsvp(g.id, v ?? "pending")}>
+                  <Select defaultValue={g.role ?? "attendee"} onValueChange={(v) => updateField(g.id, { role: v ?? "attendee" })}>
+                    <SelectTrigger className="h-7 w-28 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="attendee">Attendee</SelectItem>
+                      <SelectItem value="sponsor">Sponsor</SelectItem>
+                      <SelectItem value="vip">VIP</SelectItem>
+                      <SelectItem value="speaker">Speaker</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </TableCell>
+                <TableCell>
+                  <Select defaultValue={g.rsvpStatus ?? "pending"} onValueChange={(v) => updateField(g.id, { rsvpStatus: v ?? "pending" })}>
                     <SelectTrigger className="h-7 w-28 text-xs">
                       <SelectValue />
                     </SelectTrigger>
