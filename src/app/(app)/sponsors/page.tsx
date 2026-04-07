@@ -15,6 +15,7 @@ import {
 import { formatDate } from "@/lib/utils";
 import { Plus } from "lucide-react";
 import { SponsorSearch } from "@/components/sponsors/SponsorSearch";
+import { DeleteSponsorButton } from "@/components/sponsors/DeleteSponsorButton";
 
 interface PageProps {
   searchParams: Promise<{ search?: string }>;
@@ -59,6 +60,7 @@ export default async function SponsorsPage({ searchParams }: PageProps) {
               <TableHead>Website</TableHead>
               <TableHead>Location</TableHead>
               <TableHead>Added</TableHead>
+              <TableHead />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -84,6 +86,9 @@ export default async function SponsorsPage({ searchParams }: PageProps) {
                 </TableCell>
                 <TableCell className="text-muted-foreground text-sm">
                   {formatDate(s.createdAt)}
+                </TableCell>
+                <TableCell>
+                  <DeleteSponsorButton sponsorId={s.id} />
                 </TableCell>
               </TableRow>
             ))}
