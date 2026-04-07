@@ -32,7 +32,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { TIER_COLORS, RSVP_COLORS, TASK_STATUS_COLORS, formatCurrency } from "@/lib/utils";
-import { Plus, Trash2, Check } from "lucide-react";
+import { Plus, Trash2, Check, Pencil } from "lucide-react";
 import type { Event, Guest, Task, BudgetCategory } from "@/db/schema";
 
 interface EventSponsorRow {
@@ -329,11 +329,37 @@ function GuestsTab({ eventId, guests }: Pick<EventActionsClientProps, "eventId" 
 }
 
 // ─── Tasks Tab ─────────────────────────────────────────────────────────────────
+const TASK_OWNERS = ["Bhavana", "Gowtham"];
+
+function OwnerPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="flex gap-2 mt-1">
+      {TASK_OWNERS.map((owner) => (
+        <button
+          key={owner}
+          type="button"
+          onClick={() => onChange(value === owner ? "" : owner)}
+          className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+            value === owner
+              ? "bg-primary text-primary-foreground border-primary"
+              : "bg-background text-muted-foreground border-border hover:border-primary/50"
+          }`}
+        >
+          {owner}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function TasksTab({ eventId, tasks }: Pick<EventActionsClientProps, "eventId" | "tasks">) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ title: "", assignedTo: "", dueDate: "", notes: "" });
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [editForm, setEditForm] = useState({ title: "", assignedTo: "", dueDate: "", notes: "", status: "todo" });
+  const [editSaving, setEditSaving] = useState(false);
 
   async function addTask() {
     setSaving(true);
@@ -351,6 +377,36 @@ function TasksTab({ eventId, tasks }: Pick<EventActionsClientProps, "eventId" | 
       toast.error("Failed to create task");
     } finally {
       setSaving(false);
+    }
+  }
+
+  function openEdit(t: Task) {
+    setEditingTask(t);
+    setEditForm({
+      title: t.title,
+      assignedTo: t.assignedTo ?? "",
+      dueDate: t.dueDate ?? "",
+      notes: t.notes ?? "",
+      status: t.status ?? "todo",
+    });
+  }
+
+  async function saveEdit() {
+    if (!editingTask) return;
+    setEditSaving(true);
+    try {
+      await fetch(`/api/events/${eventId}/tasks/${editingTask.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editForm),
+      });
+      toast.success("Task updated");
+      setEditingTask(null);
+      router.refresh();
+    } catch {
+      toast.error("Failed to update task");
+    } finally {
+      setEditSaving(false);
     }
   }
 
@@ -386,7 +442,7 @@ function TasksTab({ eventId, tasks }: Pick<EventActionsClientProps, "eventId" | 
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <Label>Assigned To</Label>
-                  <Input value={form.assignedTo} onChange={(e) => setForm({ ...form, assignedTo: e.target.value })} />
+                  <OwnerPicker value={form.assignedTo} onChange={(v) => setForm({ ...form, assignedTo: v })} />
                 </div>
                 <div>
                   <Label>Due Date</Label>
@@ -405,15 +461,58 @@ function TasksTab({ eventId, tasks }: Pick<EventActionsClientProps, "eventId" | 
         </Dialog>
       </div>
 
+      {/* Edit Task Dialog */}
+      <Dialog open={!!editingTask} onOpenChange={(o) => { if (!o) setEditingTask(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit Task</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Title *</Label>
+              <Input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label>Assigned To</Label>
+                <OwnerPicker value={editForm.assignedTo} onChange={(v) => setEditForm({ ...editForm, assignedTo: v })} />
+              </div>
+              <div>
+                <Label>Due Date</Label>
+                <Input type="date" value={editForm.dueDate} onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })} />
+              </div>
+            </div>
+            <div>
+              <Label>Status</Label>
+              <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v ?? "todo" })}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todo">To Do</SelectItem>
+                  <SelectItem value="in_progress">In Progress</SelectItem>
+                  <SelectItem value="done">Done</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Notes</Label>
+              <Textarea value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} rows={3} />
+            </div>
+            <Button onClick={saveEdit} disabled={!editForm.title || editSaving} className="w-full">
+              {editSaving ? "Saving…" : "Save Changes"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {tasks.length === 0 ? (
         <p className="text-sm text-muted-foreground py-4 text-center">No tasks yet.</p>
       ) : (
         <div className="space-y-2">
           {tasks.map((t) => (
-            <div key={t.id} className="flex items-center gap-3 rounded-md border p-3">
+            <div key={t.id} className="flex items-start gap-3 rounded-md border p-3">
               <button
                 onClick={() => updateStatus(t.id, t.status === "done" ? "todo" : "done")}
-                className={`h-5 w-5 shrink-0 rounded border-2 flex items-center justify-center transition-colors ${t.status === "done" ? "bg-green-500 border-green-500 text-white" : "border-gray-300"}`}
+                className={`h-5 w-5 shrink-0 rounded border-2 flex items-center justify-center transition-colors mt-0.5 ${t.status === "done" ? "bg-green-500 border-green-500 text-white" : "border-gray-300"}`}
               >
                 {t.status === "done" && <Check className="h-3 w-3" />}
               </button>
@@ -421,10 +520,17 @@ function TasksTab({ eventId, tasks }: Pick<EventActionsClientProps, "eventId" | 
                 <p className={`text-sm font-medium ${t.status === "done" ? "line-through text-muted-foreground" : ""}`}>
                   {t.title}
                 </p>
-                <div className="flex gap-2 text-xs text-muted-foreground mt-0.5">
-                  {t.assignedTo && <span>→ {t.assignedTo}</span>}
-                  {t.dueDate && <span>Due: {t.dueDate}</span>}
+                <div className="flex flex-wrap gap-2 items-center mt-1">
+                  {t.assignedTo && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20">
+                      {t.assignedTo}
+                    </span>
+                  )}
+                  {t.dueDate && <span className="text-xs text-muted-foreground">Due: {t.dueDate}</span>}
                 </div>
+                {t.notes && (
+                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{t.notes}</p>
+                )}
               </div>
               <Select defaultValue={t.status ?? "todo"} onValueChange={(v) => updateStatus(t.id, v ?? "todo")}>
                 <SelectTrigger className="h-7 w-28 text-xs shrink-0">
@@ -436,7 +542,10 @@ function TasksTab({ eventId, tasks }: Pick<EventActionsClientProps, "eventId" | 
                   <SelectItem value="done">Done</SelectItem>
                 </SelectContent>
               </Select>
-              <Button variant="ghost" size="icon" onClick={() => deleteTask(t.id)}>
+              <Button variant="ghost" size="icon" className="shrink-0" onClick={() => openEdit(t)}>
+                <Pencil className="h-3 w-3" />
+              </Button>
+              <Button variant="ghost" size="icon" className="shrink-0" onClick={() => deleteTask(t.id)}>
                 <Trash2 className="h-3 w-3 text-red-500" />
               </Button>
             </div>
