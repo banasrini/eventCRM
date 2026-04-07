@@ -185,11 +185,21 @@ function SponsorsTab({ eventId, eventSponsors }: { eventId: string; eventSponsor
 }
 
 // ─── Guests Tab ────────────────────────────────────────────────────────────────
+const CONTACTED_VIA_LABELS: Record<string, string> = { linkedin: "LI", email: "Email", msg: "Msg" };
+const CONTACTED_VIA_COLORS: Record<string, string> = {
+  linkedin: "bg-blue-100 text-blue-700 border-blue-200",
+  email: "bg-gray-100 text-gray-700 border-gray-200",
+  msg: "bg-green-100 text-green-700 border-green-200",
+};
+
 function GuestsTab({ eventId, guests }: Pick<EventActionsClientProps, "eventId" | "guests">) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", role: "attendee", rsvpStatus: "pending", notes: "" });
+  const [form, setForm] = useState({ name: "", email: "", company: "", contactedVia: "", role: "attendee", rsvpStatus: "pending", notes: "" });
+  const [importOpen, setImportOpen] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [importing, setImporting] = useState(false);
 
   async function addGuest() {
     setSaving(true);
@@ -197,18 +207,51 @@ function GuestsTab({ eventId, guests }: Pick<EventActionsClientProps, "eventId" 
       const res = await fetch(`/api/events/${eventId}/guests`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, contactedVia: form.contactedVia || undefined }),
       });
       if (!res.ok) throw new Error();
       toast.success("Guest added");
       setOpen(false);
-      setForm({ name: "", email: "", role: "attendee", rsvpStatus: "pending", notes: "" });
+      setForm({ name: "", email: "", company: "", contactedVia: "", role: "attendee", rsvpStatus: "pending", notes: "" });
       router.refresh();
     } catch {
       toast.error("Failed to add guest");
     } finally {
       setSaving(false);
     }
+  }
+
+  async function bulkImport() {
+    const lines = importText.trim().split("\n").filter(Boolean);
+    if (!lines.length) return;
+    setImporting(true);
+    let added = 0;
+    for (const line of lines) {
+      const parts = line.split(/\t|  +/).map((p) => p.trim()).filter(Boolean);
+      if (parts.length < 1) continue;
+      const name = parts[0];
+      // detect which part is the channel (LI / Email / Msg / LinkedIn)
+      let contactedVia: string | undefined;
+      let company: string | undefined;
+      for (let i = 1; i < parts.length; i++) {
+        const p = parts[i].toLowerCase();
+        if (p === "li" || p === "linkedin") { contactedVia = "linkedin"; }
+        else if (p === "email") { contactedVia = "email"; }
+        else if (p === "msg") { contactedVia = "msg"; }
+        else { company = parts[i]; }
+      }
+      await fetch(`/api/events/${eventId}/guests`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, company, contactedVia }),
+      });
+      added++;
+    }
+    toast.success(`${added} guest${added !== 1 ? "s" : ""} imported`);
+    setImportOpen(false);
+    setImportText("");
+    setImporting(false);
+    router.refresh();
   }
 
   async function updateRsvp(guestId: string, rsvpStatus: string) {
@@ -228,7 +271,31 @@ function GuestsTab({ eventId, guests }: Pick<EventActionsClientProps, "eventId" 
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        {/* Bulk Import */}
+        <Dialog open={importOpen} onOpenChange={setImportOpen}>
+          <DialogTrigger render={<Button size="sm" variant="outline" />}>
+            Import List
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Bulk Import Guests</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">Paste rows with columns: <strong>Name · LI/Email/Msg · Company</strong> (tab or multi-space separated)</p>
+              <Textarea
+                value={importText}
+                onChange={(e) => setImportText(e.target.value)}
+                rows={10}
+                placeholder={"Darlene Yu    Msg    Our Place\nAndreas Andrea    LI    Living Proof"}
+                className="font-mono text-xs"
+              />
+              <Button onClick={bulkImport} disabled={!importText.trim() || importing} className="w-full">
+                {importing ? "Importing…" : "Import"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add single guest */}
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger render={<Button size="sm" />}>
             <Plus className="h-3 w-3 mr-1" /> Add Guest
@@ -239,6 +306,23 @@ function GuestsTab({ eventId, guests }: Pick<EventActionsClientProps, "eventId" 
               <div>
                 <Label>Name *</Label>
                 <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label>Company</Label>
+                  <Input value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Contacted Via</Label>
+                  <Select value={form.contactedVia} onValueChange={(v) => setForm({ ...form, contactedVia: v ?? "" })}>
+                    <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="linkedin">LinkedIn</SelectItem>
+                      <SelectItem value="email">Email</SelectItem>
+                      <SelectItem value="msg">Msg</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <div>
                 <Label>Email</Label>
@@ -288,6 +372,8 @@ function GuestsTab({ eventId, guests }: Pick<EventActionsClientProps, "eventId" 
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
+              <TableHead>Company</TableHead>
+              <TableHead>Via</TableHead>
               <TableHead>Role</TableHead>
               <TableHead>RSVP</TableHead>
               <TableHead />
@@ -300,6 +386,14 @@ function GuestsTab({ eventId, guests }: Pick<EventActionsClientProps, "eventId" 
                   <div className="font-medium">{g.name}</div>
                   {g.email && <div className="text-xs text-muted-foreground">{g.email}</div>}
                   {g.sponsorId && <Badge variant="secondary" className="text-[10px] mt-0.5">Sponsor contact</Badge>}
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">{g.company ?? "—"}</TableCell>
+                <TableCell>
+                  {g.contactedVia ? (
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${CONTACTED_VIA_COLORS[g.contactedVia]}`}>
+                      {CONTACTED_VIA_LABELS[g.contactedVia]}
+                    </span>
+                  ) : "—"}
                 </TableCell>
                 <TableCell className="capitalize text-sm">{g.role}</TableCell>
                 <TableCell>

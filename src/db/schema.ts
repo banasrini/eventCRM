@@ -59,6 +59,8 @@ export const guests = sqliteTable("guests", {
   }),
   name: text("name").notNull(),
   email: text("email"),
+  company: text("company"),
+  contactedVia: text("contacted_via", { enum: ["linkedin", "email", "msg"] }),
   rsvpStatus: text("rsvp_status", {
     enum: ["pending", "confirmed", "declined"],
   }).default("pending"),

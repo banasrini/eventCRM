@@ -50,6 +50,8 @@ export const UpdateEventSponsorSchema = z.object({
 export const CreateGuestSchema = z.object({
   name: z.string().min(1),
   email: z.string().email().optional().or(z.literal("")),
+  company: z.string().optional(),
+  contactedVia: z.enum(["linkedin", "email", "msg"]).optional(),
   rsvpStatus: RsvpEnum.optional().default("pending"),
   role: RoleEnum.optional().default("attendee"),
   sponsorId: z.string().optional(),
