@@ -29,6 +29,13 @@
       "when": 1744214400000,
       "tag": "0003_sponsors_new_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1744300800000,
+      "tag": "0004_sponsor_notes",
+      "breakpoints": true
     }
   ]
 }

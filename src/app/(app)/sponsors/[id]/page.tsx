@@ -2,8 +2,8 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
-import { sponsors, eventSponsors, events } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { sponsors, eventSponsors, events, sponsorNotes } from "@/db/schema";
+import { eq, desc } from "drizzle-orm";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +18,7 @@ import {
 import { STATUS_COLORS, TIER_COLORS, formatDate, formatCurrency } from "@/lib/utils";
 import { Pencil, ArrowLeft } from "lucide-react";
 import { DeleteSponsorButton } from "@/components/sponsors/DeleteSponsorButton";
+import { RelationshipIntelligence } from "@/components/sponsors/RelationshipIntelligence";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -29,19 +30,26 @@ export default async function SponsorDetailPage({ params }: PageProps) {
   const [sponsor] = await db.select().from(sponsors).where(eq(sponsors.id, id));
   if (!sponsor) notFound();
 
-  const history = await db
-    .select({
-      eventId: events.id,
-      eventName: events.name,
-      eventDate: events.date,
-      eventStatus: events.status,
-      tier: eventSponsors.tier,
-      contribution: eventSponsors.contribution,
-    })
-    .from(eventSponsors)
-    .innerJoin(events, eq(eventSponsors.eventId, events.id))
-    .where(eq(eventSponsors.sponsorId, id))
-    .orderBy(events.date);
+  const [history, notes] = await Promise.all([
+    db
+      .select({
+        eventId: events.id,
+        eventName: events.name,
+        eventDate: events.date,
+        eventStatus: events.status,
+        tier: eventSponsors.tier,
+        contribution: eventSponsors.contribution,
+      })
+      .from(eventSponsors)
+      .innerJoin(events, eq(eventSponsors.eventId, events.id))
+      .where(eq(eventSponsors.sponsorId, id))
+      .orderBy(events.date),
+    db
+      .select()
+      .from(sponsorNotes)
+      .where(eq(sponsorNotes.sponsorId, id))
+      .orderBy(desc(sponsorNotes.createdAt)),
+  ]);
 
   const tags: string[] = sponsor.tags ? JSON.parse(sponsor.tags) : [];
   const location = [sponsor.city, sponsor.state, sponsor.country].filter(Boolean).join(", ");
@@ -132,18 +140,15 @@ export default async function SponsorDetailPage({ params }: PageProps) {
             <p className="text-muted-foreground">{sponsor.notes || "No notes."}</p>
           </CardContent>
         </Card>
-
-        {sponsor.aiSummary && (
-          <Card className="md:col-span-2">
-            <CardHeader>
-              <CardTitle className="text-sm font-medium">AI Relationship Summary</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">{sponsor.aiSummary}</p>
-            </CardContent>
-          </Card>
-        )}
       </div>
+
+      {/* Relationship Intelligence — between cards and event history */}
+      <RelationshipIntelligence
+        sponsorId={id}
+        initialNotes={notes}
+        initialSummary={sponsor.aiSummary}
+        initialSummaryAt={sponsor.aiSummaryAt ?? null}
+      />
 
       <Card>
         <CardHeader>

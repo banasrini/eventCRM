@@ -13,7 +13,8 @@ export const sponsors = sqliteTable("sponsors", {
   url: text("url"),
   targetCustomerRevenue: text("target_customer_revenue"),
   notes: text("notes"),
-  aiSummary: text("ai_summary"),
+  aiSummary: text("ai_summary"), // JSON: { relationshipStatus, whatTheyCareAbout, personalDetails, openActionItems, sentiment }
+  aiSummaryAt: text("ai_summary_at"),
   tags: text("tags"), // JSON string: string[]
   createdAt: text("created_at").default(sql`(CURRENT_TIMESTAMP)`),
   updatedAt: text("updated_at").default(sql`(CURRENT_TIMESTAMP)`),
@@ -115,6 +116,16 @@ export const venueOptions = sqliteTable("venue_options", {
   updatedAt: text("updated_at").default(sql`(CURRENT_TIMESTAMP)`),
 });
 
+export const sponsorNotes = sqliteTable("sponsor_notes", {
+  id: text("id").primaryKey(),
+  sponsorId: text("sponsor_id")
+    .notNull()
+    .references(() => sponsors.id, { onDelete: "cascade" }),
+  content: text("content").notNull(),
+  source: text("source"), // e.g. "email", "meeting", "linkedin", "note"
+  createdAt: text("created_at").default(sql`(CURRENT_TIMESTAMP)`),
+});
+
 export const chatMessages = sqliteTable("chat_messages", {
   id: text("id").primaryKey(),
   sessionId: text("session_id").notNull(),
@@ -139,4 +150,6 @@ export type BudgetCategory = typeof budgetCategories.$inferSelect;
 export type NewBudgetCategory = typeof budgetCategories.$inferInsert;
 export type VenueOption = typeof venueOptions.$inferSelect;
 export type NewVenueOption = typeof venueOptions.$inferInsert;
+export type SponsorNote = typeof sponsorNotes.$inferSelect;
+export type NewSponsorNote = typeof sponsorNotes.$inferInsert;
 export type ChatMessage = typeof chatMessages.$inferSelect;
