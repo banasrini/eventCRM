@@ -15,6 +15,20 @@
       "when": 1775500000000,
       "tag": "0001_guests_company_contacted",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1775695350729,
+      "tag": "0002_robust_doctor_doom",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1744214400000,
+      "tag": "0003_sponsors_new_fields",
+      "breakpoints": true
     }
   ]
 }

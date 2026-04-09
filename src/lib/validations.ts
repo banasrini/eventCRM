@@ -12,10 +12,12 @@ export const CreateSponsorSchema = z.object({
   email: z.string().email().optional().or(z.literal("")),
   phone: z.string().optional(),
   url: z.string().optional(),
+  targetCustomerRevenue: z.string().optional(),
   city: z.string().optional(),
   state: z.string().optional(),
   country: z.string().optional(),
   notes: z.string().optional(),
+  aiSummary: z.string().optional(),
   tags: z.array(z.string()).optional(),
 });
 
@@ -78,3 +80,11 @@ export const CreateBudgetCategorySchema = z.object({
 });
 
 export const UpdateBudgetCategorySchema = CreateBudgetCategorySchema.partial();
+
+export const CreateVenueOptionSchema = z.object({
+  name: z.string().min(1),
+  costPerEvent: z.number().optional(),
+  notes: z.string().optional(),
+});
+
+export const UpdateVenueOptionSchema = CreateVenueOptionSchema.partial();

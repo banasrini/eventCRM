@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
-import { events, eventSponsors, guests, tasks, budgetCategories, sponsors } from "@/db/schema";
+import { events, eventSponsors, guests, tasks, budgetCategories, sponsors, venueOptions } from "@/db/schema";
 import { eq, count, sum } from "drizzle-orm";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +21,7 @@ export default async function EventDetailPage({ params }: PageProps) {
   const [event] = await db.select().from(events).where(eq(events.id, id));
   if (!event) notFound();
 
-  const [eventSponsorsData, guestsData, tasksData, budgetData] = await Promise.all([
+  const [eventSponsorsData, guestsData, tasksData, budgetData, venueOptionsData] = await Promise.all([
     db
       .select({
         id: eventSponsors.id,
@@ -32,6 +32,8 @@ export default async function EventDetailPage({ params }: PageProps) {
         companyName: sponsors.companyName,
         contactName: sponsors.contactName,
         email: sponsors.email,
+        targetCustomerRevenue: sponsors.targetCustomerRevenue,
+        aiSummary: sponsors.aiSummary,
       })
       .from(eventSponsors)
       .innerJoin(sponsors, eq(eventSponsors.sponsorId, sponsors.id))
@@ -39,6 +41,7 @@ export default async function EventDetailPage({ params }: PageProps) {
     db.select().from(guests).where(eq(guests.eventId, id)),
     db.select().from(tasks).where(eq(tasks.eventId, id)),
     db.select().from(budgetCategories).where(eq(budgetCategories.eventId, id)),
+    db.select().from(venueOptions).where(eq(venueOptions.eventId, id)),
   ]);
 
   const totalContributions = eventSponsorsData.reduce((s, e) => s + (e.contribution ?? 0), 0);
@@ -99,6 +102,7 @@ export default async function EventDetailPage({ params }: PageProps) {
         guests={guestsData}
         tasks={tasksData}
         budget={budgetData}
+        venueOptions={venueOptionsData}
         eventId={id}
       />
     </div>

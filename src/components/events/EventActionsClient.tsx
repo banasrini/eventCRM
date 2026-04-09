@@ -32,8 +32,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { TIER_COLORS, RSVP_COLORS, TASK_STATUS_COLORS, formatCurrency } from "@/lib/utils";
-import { Plus, Trash2, Check, Pencil } from "lucide-react";
-import type { Event, Guest, Task, BudgetCategory } from "@/db/schema";
+import { Plus, Trash2, Check, Pencil, Building2, Sparkles, Loader2 } from "lucide-react";
+import type { Event, Guest, Task, BudgetCategory, VenueOption } from "@/db/schema";
 
 interface EventSponsorRow {
   id: string;
@@ -44,6 +44,8 @@ interface EventSponsorRow {
   companyName: string;
   contactName: string | null;
   email: string | null;
+  targetCustomerRevenue: string | null;
+  aiSummary: string | null;
 }
 
 interface EventActionsClientProps {
@@ -52,6 +54,7 @@ interface EventActionsClientProps {
   guests: Guest[];
   tasks: Task[];
   budget: BudgetCategory[];
+  venueOptions: VenueOption[];
   eventId: string;
 }
 
@@ -63,6 +66,16 @@ function SponsorsTab({ eventId, eventSponsors }: { eventId: string; eventSponsor
   const [tier, setTier] = useState("");
   const [contribution, setContribution] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // Inline notes editing state
+  const [editingNotes, setEditingNotes] = useState<string | null>(null); // sponsorId
+  const [noteValue, setNoteValue] = useState("");
+  const [savingNotes, setSavingNotes] = useState(false);
+
+  // AI summary state
+  const [generatingSummary, setGeneratingSummary] = useState<string | null>(null); // sponsorId
+  const [expandedSummary, setExpandedSummary] = useState<string | null>(null); // sponsorId
+  const [summaryText, setSummaryText] = useState<Record<string, string>>({});
 
   async function attach() {
     setSaving(true);
@@ -92,6 +105,46 @@ function SponsorsTab({ eventId, eventSponsors }: { eventId: string; eventSponsor
     await fetch(`/api/events/${eventId}/sponsors?sponsorId=${sid}`, { method: "DELETE" });
     toast.success("Sponsor removed");
     router.refresh();
+  }
+
+  function startEditingNotes(s: EventSponsorRow) {
+    setEditingNotes(s.sponsorId);
+    setNoteValue(s.notes ?? "");
+  }
+
+  async function saveNotes(sponsorId: string) {
+    setSavingNotes(true);
+    try {
+      const res = await fetch(`/api/events/${eventId}/sponsors?sponsorId=${sponsorId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes: noteValue }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success("Notes saved");
+      setEditingNotes(null);
+      router.refresh();
+    } catch {
+      toast.error("Failed to save notes");
+    } finally {
+      setSavingNotes(false);
+    }
+  }
+
+  async function generateSummary(s: EventSponsorRow) {
+    setGeneratingSummary(s.sponsorId);
+    try {
+      const res = await fetch(`/api/sponsors/${s.sponsorId}/summarize`, { method: "POST" });
+      if (!res.ok) throw new Error();
+      const { summary } = await res.json() as { summary: string };
+      setSummaryText((prev) => ({ ...prev, [s.sponsorId]: summary }));
+      setExpandedSummary(s.sponsorId);
+      router.refresh();
+    } catch {
+      toast.error("Failed to generate summary");
+    } finally {
+      setGeneratingSummary(null);
+    }
   }
 
   return (
@@ -156,26 +209,112 @@ function SponsorsTab({ eventId, eventSponsors }: { eventId: string; eventSponsor
               <TableHead>Contact</TableHead>
               <TableHead>Tier</TableHead>
               <TableHead className="text-right">Contribution</TableHead>
+              <TableHead>Notes</TableHead>
               <TableHead />
             </TableRow>
           </TableHeader>
           <TableBody>
             {eventSponsors.map((s) => (
-              <TableRow key={s.id}>
-                <TableCell className="font-medium">{s.companyName}</TableCell>
-                <TableCell className="text-muted-foreground text-sm">{s.contactName ?? "—"}</TableCell>
-                <TableCell>
-                  {s.tier ? (
-                    <Badge variant="outline" className={`capitalize ${TIER_COLORS[s.tier]}`}>{s.tier}</Badge>
-                  ) : "—"}
-                </TableCell>
-                <TableCell className="text-right">{formatCurrency(s.contribution)}</TableCell>
-                <TableCell>
-                  <Button variant="ghost" size="icon" onClick={() => detach(s.sponsorId)}>
-                    <Trash2 className="h-3 w-3 text-red-500" />
-                  </Button>
-                </TableCell>
-              </TableRow>
+              <>
+                <TableRow key={s.id}>
+                  <TableCell className="font-medium">
+                    <div>{s.companyName}</div>
+                    {s.targetCustomerRevenue && (
+                      <div className="text-xs text-muted-foreground mt-0.5">{s.targetCustomerRevenue}</div>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-sm">{s.contactName ?? "—"}</TableCell>
+                  <TableCell>
+                    {s.tier ? (
+                      <Badge variant="outline" className={`capitalize ${TIER_COLORS[s.tier]}`}>{s.tier}</Badge>
+                    ) : "—"}
+                  </TableCell>
+                  <TableCell className="text-right">{formatCurrency(s.contribution)}</TableCell>
+                  <TableCell className="max-w-[200px]">
+                    {editingNotes === s.sponsorId ? null : (
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs text-muted-foreground truncate">
+                          {s.notes || <span className="opacity-40">Add note…</span>}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5 shrink-0"
+                          onClick={() => startEditingNotes(s)}
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Generate AI relationship summary"
+                        disabled={generatingSummary === s.sponsorId}
+                        onClick={() => {
+                          const existing = summaryText[s.sponsorId] ?? s.aiSummary;
+                          if (existing && expandedSummary !== s.sponsorId) {
+                            setSummaryText((prev) => ({ ...prev, [s.sponsorId]: existing }));
+                            setExpandedSummary(s.sponsorId);
+                          } else if (expandedSummary === s.sponsorId) {
+                            setExpandedSummary(null);
+                          } else {
+                            generateSummary(s);
+                          }
+                        }}
+                      >
+                        {generatingSummary === s.sponsorId ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Sparkles className={`h-3 w-3 ${(summaryText[s.sponsorId] ?? s.aiSummary) ? "text-purple-500" : ""}`} />
+                        )}
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => detach(s.sponsorId)}>
+                        <Trash2 className="h-3 w-3 text-red-500" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+
+                {editingNotes === s.sponsorId && (
+                  <TableRow key={`${s.id}-notes-edit`}>
+                    <TableCell colSpan={6} className="pt-0 pb-2">
+                      <div className="flex flex-col gap-2 pl-1">
+                        <Textarea
+                          rows={2}
+                          className="text-sm"
+                          value={noteValue}
+                          onChange={(e) => setNoteValue(e.target.value)}
+                          placeholder="Add notes about this sponsorship…"
+                          autoFocus
+                        />
+                        <div className="flex gap-2">
+                          <Button size="sm" disabled={savingNotes} onClick={() => saveNotes(s.sponsorId)}>
+                            {savingNotes ? "Saving…" : "Save"}
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => setEditingNotes(null)}>
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+
+                {expandedSummary === s.sponsorId && (summaryText[s.sponsorId] ?? s.aiSummary) && (
+                  <TableRow key={`${s.id}-summary`}>
+                    <TableCell colSpan={6} className="pt-0 pb-3">
+                      <div className="rounded-md bg-purple-50 border border-purple-100 px-3 py-2 text-xs text-purple-900 leading-relaxed">
+                        <span className="font-medium text-purple-600 mr-1.5">AI Summary</span>
+                        {summaryText[s.sponsorId] ?? s.aiSummary}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </>
             ))}
           </TableBody>
         </Table>
@@ -803,8 +942,187 @@ function BudgetTab({ eventId, budget }: Pick<EventActionsClientProps, "eventId" 
   );
 }
 
+// ─── Venue Options Tab ────────────────────────────────────────────────────────
+function VenueOptionsTab({ eventId, venueOptions }: { eventId: string; venueOptions: VenueOption[] }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ name: "", costPerEvent: "", notes: "" });
+  const [editingVenue, setEditingVenue] = useState<VenueOption | null>(null);
+  const [editForm, setEditForm] = useState({ name: "", costPerEvent: "", notes: "" });
+  const [editSaving, setEditSaving] = useState(false);
+
+  async function addVenue() {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/events/${eventId}/venue-options`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name,
+          costPerEvent: form.costPerEvent ? parseFloat(form.costPerEvent) : undefined,
+          notes: form.notes || undefined,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success("Venue option added");
+      setOpen(false);
+      setForm({ name: "", costPerEvent: "", notes: "" });
+      router.refresh();
+    } catch {
+      toast.error("Failed to add venue option");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function openEdit(v: VenueOption) {
+    setEditingVenue(v);
+    setEditForm({
+      name: v.name,
+      costPerEvent: v.costPerEvent != null ? String(v.costPerEvent) : "",
+      notes: v.notes ?? "",
+    });
+  }
+
+  async function saveEdit() {
+    if (!editingVenue) return;
+    setEditSaving(true);
+    try {
+      const res = await fetch(`/api/events/${eventId}/venue-options/${editingVenue.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: editForm.name,
+          costPerEvent: editForm.costPerEvent ? parseFloat(editForm.costPerEvent) : undefined,
+          notes: editForm.notes || undefined,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success("Venue option updated");
+      setEditingVenue(null);
+      router.refresh();
+    } catch {
+      toast.error("Failed to update venue option");
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  async function deleteVenue(venueId: string) {
+    await fetch(`/api/events/${eventId}/venue-options/${venueId}`, { method: "DELETE" });
+    toast.success("Venue option removed");
+    router.refresh();
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex justify-end">
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger render={<Button size="sm" />}>
+            <Plus className="h-3 w-3 mr-1" /> Add Venue
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Add Venue Option</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <div>
+                <Label>Venue Name *</Label>
+                <Input
+                  placeholder="e.g. The Grand Hall"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Cost per Event ($)</Label>
+                <Input
+                  type="number"
+                  placeholder="0"
+                  value={form.costPerEvent}
+                  onChange={(e) => setForm({ ...form, costPerEvent: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Notes</Label>
+                <Textarea
+                  placeholder="Capacity, amenities, contact info, parking, etc."
+                  value={form.notes}
+                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                  rows={3}
+                />
+              </div>
+              <Button onClick={addVenue} disabled={!form.name || saving} className="w-full">
+                {saving ? "Adding…" : "Add Venue"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editingVenue} onOpenChange={(o) => { if (!o) setEditingVenue(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit Venue Option</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Venue Name *</Label>
+              <Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
+            </div>
+            <div>
+              <Label>Cost per Event ($)</Label>
+              <Input
+                type="number"
+                value={editForm.costPerEvent}
+                onChange={(e) => setEditForm({ ...editForm, costPerEvent: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label>Notes</Label>
+              <Textarea
+                value={editForm.notes}
+                onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                rows={4}
+              />
+            </div>
+            <Button onClick={saveEdit} disabled={!editForm.name || editSaving} className="w-full">
+              {editSaving ? "Saving…" : "Save Changes"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {venueOptions.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-4 text-center">No venue options yet.</p>
+      ) : (
+        <div className="space-y-2">
+          {venueOptions.map((v) => (
+            <div key={v.id} className="flex items-start gap-3 rounded-md border p-3">
+              <Building2 className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium">{v.name}</p>
+                {v.costPerEvent != null && (
+                  <p className="text-xs text-muted-foreground mt-0.5">{formatCurrency(v.costPerEvent)} per event</p>
+                )}
+                {v.notes && (
+                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed whitespace-pre-wrap">{v.notes}</p>
+                )}
+              </div>
+              <Button variant="ghost" size="icon" className="shrink-0" onClick={() => openEdit(v)}>
+                <Pencil className="h-3 w-3" />
+              </Button>
+              <Button variant="ghost" size="icon" className="shrink-0" onClick={() => deleteVenue(v.id)}>
+                <Trash2 className="h-3 w-3 text-red-500" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
-export function EventActionsClient({ event, eventSponsors, guests, tasks, budget, eventId }: EventActionsClientProps) {
+export function EventActionsClient({ event, eventSponsors, guests, tasks, budget, venueOptions, eventId }: EventActionsClientProps) {
   return (
     <Tabs defaultValue="sponsors">
       <TabsList>
@@ -812,6 +1130,7 @@ export function EventActionsClient({ event, eventSponsors, guests, tasks, budget
         <TabsTrigger value="guests">Guests ({guests.length})</TabsTrigger>
         <TabsTrigger value="tasks">Tasks ({tasks.length})</TabsTrigger>
         <TabsTrigger value="budget">Budget</TabsTrigger>
+        <TabsTrigger value="venues">Venue Options ({venueOptions.length})</TabsTrigger>
       </TabsList>
       <TabsContent value="sponsors" className="mt-4">
         <SponsorsTab eventId={eventId} eventSponsors={eventSponsors} />
@@ -824,6 +1143,9 @@ export function EventActionsClient({ event, eventSponsors, guests, tasks, budget
       </TabsContent>
       <TabsContent value="budget" className="mt-4">
         <BudgetTab eventId={eventId} budget={budget} />
+      </TabsContent>
+      <TabsContent value="venues" className="mt-4">
+        <VenueOptionsTab eventId={eventId} venueOptions={venueOptions} />
       </TabsContent>
     </Tabs>
   );

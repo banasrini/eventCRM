@@ -32,6 +32,7 @@ export function SponsorForm({ sponsor }: SponsorFormProps) {
       email: data.email || undefined,
       phone: data.phone || undefined,
       url: data.url || undefined,
+      targetCustomerRevenue: data.targetCustomerRevenue || undefined,
       city: data.city || undefined,
       state: data.state || undefined,
       country: data.country || undefined,
@@ -133,6 +134,16 @@ export function SponsorForm({ sponsor }: SponsorFormProps) {
             defaultValue={sponsor?.country ?? ""}
           />
         </div>
+      </div>
+
+      <div>
+        <Label htmlFor="targetCustomerRevenue">Target Customer Revenue</Label>
+        <Input
+          id="targetCustomerRevenue"
+          name="targetCustomerRevenue"
+          placeholder="e.g. SMB $1–10M ARR, Enterprise $50M+"
+          defaultValue={sponsor?.targetCustomerRevenue ?? ""}
+        />
       </div>
 
       <div>

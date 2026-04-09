@@ -108,6 +108,10 @@ export default async function SponsorDetailPage({ params }: PageProps) {
               <span className="text-muted-foreground">Location</span>
               <span>{location || "—"}</span>
             </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Target Customer Revenue</span>
+              <span>{sponsor.targetCustomerRevenue || "—"}</span>
+            </div>
           </CardContent>
         </Card>
 
@@ -128,6 +132,17 @@ export default async function SponsorDetailPage({ params }: PageProps) {
             <p className="text-muted-foreground">{sponsor.notes || "No notes."}</p>
           </CardContent>
         </Card>
+
+        {sponsor.aiSummary && (
+          <Card className="md:col-span-2">
+            <CardHeader>
+              <CardTitle className="text-sm font-medium">AI Relationship Summary</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">{sponsor.aiSummary}</p>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <Card>

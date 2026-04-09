@@ -22,6 +22,8 @@ export async function GET(
       companyName: sponsors.companyName,
       contactName: sponsors.contactName,
       email: sponsors.email,
+      targetCustomerRevenue: sponsors.targetCustomerRevenue,
+      aiSummary: sponsors.aiSummary,
     })
     .from(eventSponsors)
     .innerJoin(sponsors, eq(eventSponsors.sponsorId, sponsors.id))
