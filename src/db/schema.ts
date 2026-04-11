@@ -121,6 +121,7 @@ export const sponsorNotes = sqliteTable("sponsor_notes", {
   sponsorId: text("sponsor_id")
     .notNull()
     .references(() => sponsors.id, { onDelete: "cascade" }),
+  title: text("title"),
   content: text("content").notNull(),
   source: text("source"), // e.g. "email", "meeting", "linkedin", "note"
   createdAt: text("created_at").default(sql`(CURRENT_TIMESTAMP)`),

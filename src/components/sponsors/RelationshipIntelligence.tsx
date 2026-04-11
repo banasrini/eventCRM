@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, RefreshCw, Plus, Trash2, Loader2, FileText } from "lucide-react";
+import { Sparkles, RefreshCw, Plus, Trash2, Loader2, FileText, ChevronDown, ChevronRight } from "lucide-react";
 import type { SponsorNote } from "@/db/schema";
 
 interface AIBrief {
@@ -67,10 +67,21 @@ export function RelationshipIntelligence({ sponsorId, initialNotes, initialSumma
   const [summaryAt, setSummaryAt] = useState<string | null>(initialSummaryAt);
 
   const [generating, setGenerating] = useState(false);
+  const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [source, setSource] = useState("");
   const [addingNote, setAddingNote] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  function toggleExpand(id: string) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   async function generateSummary() {
     setGenerating(true);
@@ -95,11 +106,12 @@ export function RelationshipIntelligence({ sponsorId, initialNotes, initialSumma
       const res = await fetch(`/api/sponsors/${sponsorId}/notes`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: content.trim(), source: source || undefined }),
+        body: JSON.stringify({ title: title.trim() || undefined, content: content.trim(), source: source || undefined }),
       });
       if (!res.ok) throw new Error();
       const note = await res.json() as SponsorNote;
       setNotes((prev) => [note, ...prev]);
+      setTitle("");
       setContent("");
       setSource("");
       setShowForm(false);
@@ -217,6 +229,16 @@ export function RelationshipIntelligence({ sponsorId, initialNotes, initialSumma
           {showForm && (
             <div className="rounded-md border p-3 space-y-3 bg-muted/30">
               <div>
+                <Label className="text-xs">Name</Label>
+                <Input
+                  placeholder="e.g. Intro call recap, Q2 follow-up email…"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="mt-1 text-sm h-8"
+                  autoFocus
+                />
+              </div>
+              <div>
                 <Label className="text-xs">Content</Label>
                 <Textarea
                   rows={4}
@@ -224,7 +246,6 @@ export function RelationshipIntelligence({ sponsorId, initialNotes, initialSumma
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   className="mt-1 text-sm"
-                  autoFocus
                 />
               </div>
               <div>
@@ -256,7 +277,7 @@ export function RelationshipIntelligence({ sponsorId, initialNotes, initialSumma
                 <Button size="sm" disabled={!content.trim() || addingNote} onClick={addNote}>
                   {addingNote ? "Saving…" : "Save"}
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => { setShowForm(false); setContent(""); setSource(""); }}>
+                <Button size="sm" variant="outline" onClick={() => { setShowForm(false); setTitle(""); setContent(""); setSource(""); }}>
                   Cancel
                 </Button>
               </div>
@@ -264,30 +285,46 @@ export function RelationshipIntelligence({ sponsorId, initialNotes, initialSumma
           )}
 
           {notes.length > 0 ? (
-            <div className="space-y-2">
-              {notes.map((note) => (
-                <div key={note.id} className="flex gap-3 group rounded-md p-2.5 border bg-card hover:bg-muted/30 transition-colors">
-                  <div className="flex-1 min-w-0 space-y-1">
-                    <div className="flex items-center gap-2">
-                      {note.source && (
-                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0 capitalize">
-                          {note.source}
-                        </Badge>
-                      )}
-                      <span className="text-xs text-muted-foreground">{formatDate(note.createdAt)}</span>
+            <div className="space-y-1.5">
+              {notes.map((note) => {
+                const expanded = expandedIds.has(note.id);
+                const label = note.title || note.content.slice(0, 60) + (note.content.length > 60 ? "…" : "");
+                return (
+                  <div key={note.id} className="group rounded-md border bg-card transition-colors">
+                    <div
+                      className="flex items-center gap-2 px-2.5 py-2 cursor-pointer hover:bg-muted/30 transition-colors"
+                      onClick={() => toggleExpand(note.id)}
+                    >
+                      {expanded
+                        ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      }
+                      <span className="flex-1 text-sm font-medium truncate">{label}</span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {note.source && (
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0 capitalize">
+                            {note.source}
+                          </Badge>
+                        )}
+                        <span className="text-xs text-muted-foreground">{formatDate(note.createdAt)}</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => { e.stopPropagation(); deleteNote(note.id); }}
+                        >
+                          <Trash2 className="h-3 w-3 text-red-400" />
+                        </Button>
+                      </div>
                     </div>
-                    <p className="text-sm whitespace-pre-wrap break-words">{note.content}</p>
+                    {expanded && (
+                      <div className="px-7 pb-3 pt-0">
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words">{note.content}</p>
+                      </div>
+                    )}
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => deleteNote(note.id)}
-                  >
-                    <Trash2 className="h-3 w-3 text-red-400" />
-                  </Button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             !showForm && (

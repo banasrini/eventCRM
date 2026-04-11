@@ -23,7 +23,7 @@ export async function POST(
   ctx: { params: Promise<{ id: string }> }
 ) {
   const { id: sponsorId } = await ctx.params;
-  const body = await request.json() as { content: string; source?: string };
+  const body = await request.json() as { content: string; source?: string; title?: string };
 
   if (!body.content?.trim()) {
     return Response.json({ error: "content is required" }, { status: 400 });
@@ -34,6 +34,7 @@ export async function POST(
     .values({
       id: generateId(),
       sponsorId,
+      title: body.title?.trim() || null,
       content: body.content.trim(),
       source: body.source || null,
       createdAt: new Date().toISOString(),
